@@ -111,8 +111,8 @@ h1 .dot{ color:var(--c-o); }
 .zone-hint small{ display:block; font-size:13px; opacity:.7; margin-top:2px; }
 .zone.busy .zone-hint, .zone.armed .zone-hint{ opacity:0; }
 
-.slot{ position:relative; width:0; }
-.slot.show{ width:auto; }
+/* slots are free-floating: positioned exactly where the element was dropped */
+.slot{ position:absolute; }
 
 /* tiny floating dust/marks inside zone for life */
 .zone .speck{ position:absolute; width:4px; height:4px; border-radius:50%;
@@ -144,7 +144,6 @@ h1 .dot{ color:var(--c-o); }
 .tile .blob{ width:100%; height:100%; }
 .tile .blob .sym{ font-size:clamp(20px,5vw,27px); }
 .tile:hover, .tile:focus-visible{ transform:translateY(-7px) rotate(2deg) scale(1.06); }
-.tile:hover .shape path, .tile:focus-visible .shape path{ filter:url(#boil2); }
 .tile:focus-visible .blob::after{
   content:""; position:absolute; inset:-9px; border-radius:50%;
   border:2.5px dashed var(--c-o); animation:spin 9s linear infinite;
@@ -244,7 +243,10 @@ footer a{ color:var(--ink); }
   100%{ opacity:0; transform:rotate(var(--a)) translateY(34px) scaleY(.2); } }
 
 /* the compound itself */
-.compound{ position:relative; display:grid; place-items:center; z-index:4; }
+/* compound: positioned wrapper (centering) + inner that carries the personality motion,
+   so the per-compound animation transforms never fight the centering transform */
+.compound{ position:absolute; transform:translate(-50%,-50%); z-index:4; }
+.compound-inner{ position:relative; display:grid; place-items:center; }
 .compound .blob{ width:128px; height:128px; }
 .compound .blob .sym{ font-size:30px; }
 .compound svg.shape path.draw{ stroke-dasharray:560; stroke-dashoffset:560; animation:draw .7s var(--ease-soft) .05s forwards; }
@@ -595,7 +597,7 @@ function endDrag(e){
   if(d.ghost){
     const overZone = isOverZone(e.clientX,e.clientY);
     d.ghost.remove(); d.tile.classList.remove("lift");
-    if(overZone){ placeElement(d.sym); }
+    if(overZone){ placeElement(d.sym, zonePos(e.clientX,e.clientY)); }
   } else {
     // it was a tap, not a drag → tap-to-select behaviour
     handleTap(d.sym, d.tile, e);
@@ -609,6 +611,15 @@ function isOverZone(x,y){
   const pad = 30; // generous hit area, mobile-friendly
   return x>r.left-pad && x<r.right+pad && y>r.top-pad && y<r.bottom+pad;
 }
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+// where in the zone (as a 0..1 fraction) did this drop land? clamped so the
+// blob never overhangs the edge. fractions stay correct across resizes.
+function zonePos(x,y){
+  const r = zone.getBoundingClientRect();
+  return { fx: clamp((x-r.left)/r.width, .13, .87), fy: clamp((y-r.top)/r.height, .17, .83) };
+}
+// taps have no drop point, so fall back to a tidy left/right pair that bonds well
+function defaultPos(i){ return i===0 ? {fx:.37, fy:.5} : {fx:.63, fy:.5}; }
 
 /* tap on a tile: select it (and place if zone is the obvious next move) */
 /* A tap on a tile places it straight into the zone — tap two and they combine.
@@ -636,13 +647,15 @@ zone.addEventListener("click", ()=>{
 /* =========================================================================
    PLACE / RESOLVE
    ========================================================================= */
-function placeElement(sym){
+function placeElement(sym, pos){
   if(state.busy) return;
   if(state.resolved){ clearZone(); }
   if(state.zone.length>=2) return;
 
-  state.zone.push(sym);
-  renderZone();
+  const p = pos || defaultPos(state.zone.length);
+  const item = { sym, fx:p.fx, fy:p.fy };
+  state.zone.push(item);
+  renderSlot(item, state.zone.length-1);
   zone.classList.add("armed");
 
   if(state.zone.length===1){
@@ -653,32 +666,34 @@ function placeElement(sym){
   }
 }
 
-function renderZone(){
-  // keep frame + hint, render slots
-  [...zone.querySelectorAll(".slot,.compound,.burst,.haze,.particle,.glint")].forEach(n=>n.remove());
-  state.zone.forEach((sym,i)=>{
-    const el = ELEM[sym];
-    const slot = document.createElement("div");
-    slot.className = "slot show";
-    slot.innerHTML = blobHTML(el.color, el.sym, {dark:el.dark, size:el.size});
-    const blob = slot.querySelector(".blob");
-    blob.classList.add("dropin");
-    if(state.zone.length===1) blob.classList.add("pulse");
-    blob.dataset.slot = i;
-    zone.appendChild(slot);
-  });
+// render ONE slot where it was dropped (append-only, so the first element
+// never re-animates or jumps when the second one lands)
+function renderSlot(item, i){
+  const el = ELEM[item.sym];
+  const slot = document.createElement("div");
+  slot.className = "slot"; slot.dataset.idx = i;
+  slot.style.left = item.fx*100+"%";
+  slot.style.top  = item.fy*100+"%";
+  // size personality lives on the slot so the drop-in animation can't reset it
+  slot.style.transform = `translate(-50%,-50%) scale(${el.size||1})`;
+  slot.innerHTML = blobHTML(el.color, el.sym, {dark:el.dark});
+  const blob = slot.querySelector(".blob");
+  blob.classList.add("dropin");
+  zone.appendChild(slot);
+  // first element drops in, THEN starts breathing while it waits for a partner
+  if(i===0) setTimeout(()=>{ if(state.zone.length===1 && !state.busy) blob.classList.add("pulse"); }, 470);
 }
 
 function resolve(){
-  const [a,b] = state.zone;
-  const ea = ELEM[a], eb = ELEM[b];
+  if(state.zone.length < 2) return;   // guard against a stray clear racing the resolve
+  const a = state.zone[0], b = state.zone[1];
+  const ea = ELEM[a.sym], eb = ELEM[b.sym];
 
   // noble easter eggs win over everything; first-placed noble wins
   if(ea.type==="noble" || eb.type==="noble"){
-    const nobleSym = ea.type==="noble" ? a : b;
-    return nobleGag(nobleSym);
+    return nobleGag(ea.type==="noble" ? a.sym : b.sym);
   }
-  const key = keyOf(a,b);
+  const key = keyOf(a.sym, b.sym);
   const r = REACTIONS[key];
   if(r){ validCombine(key, r); }
   else { invalid(); }
@@ -689,17 +704,24 @@ function resolve(){
    ========================================================================= */
 function validCombine(key, r){
   zone.classList.add("busy");
-  const slots = zone.querySelectorAll(".slot .blob");
-  slots[0]?.parentElement.classList.add("bonding","left");
-  slots[1]?.parentElement.classList.add("bonding","right");
-  slots.forEach(s=>s.classList.remove("pulse"));
+  const a = state.zone[0], b = state.zone[1];
+  const mid = { fx:(a.fx+b.fx)/2, fy:(a.fy+b.fy)/2 };
 
-  // spark burst at center
-  setTimeout(()=>spawnBurst(), 360);
+  // drift both elements together to their meeting point, then bond there
+  [...zone.querySelectorAll(".slot")].forEach((slot,i)=>{
+    const el = ELEM[state.zone[i].sym];
+    slot.querySelector(".blob")?.classList.remove("pulse");
+    slot.style.transition = "left .45s var(--ease-soft), top .45s var(--ease-soft), transform .45s var(--ease-soft)";
+    slot.style.left = mid.fx*100+"%";
+    slot.style.top  = mid.fy*100+"%";
+    slot.style.transform = `translate(-50%,-50%) scale(${(el.size||1)*0.82})`;
+  });
+
+  setTimeout(()=>spawnBurst(mid), 380);
 
   setTimeout(()=>{
     [...zone.querySelectorAll(".slot")].forEach(n=>n.remove());
-    revealCompound(key, r, false);
+    revealCompound(key, r, mid);
     const isNew = !state.found.has(key);
     if(isNew){
       state.found.add(key); saveFound(); updateCount();
@@ -710,35 +732,42 @@ function validCombine(key, r){
   }, 620);
 }
 
-function spawnBurst(){
+function spawnBurst(pos){
+  pos = pos || {fx:.5,fy:.5};
   const burst = document.createElement("div"); burst.className="burst";
+  burst.style.left = pos.fx*100+"%"; burst.style.top = pos.fy*100+"%";
   for(let i=0;i<10;i++){ const s=document.createElement("i"); s.style.setProperty("--a",(i*36)+"deg"); burst.appendChild(s); }
   zone.appendChild(burst);
   requestAnimationFrame(()=>burst.classList.add("go"));
   setTimeout(()=>burst.remove(), 700);
 }
 
-function revealCompound(key, r, replay){
+// reveal the compound at `pos` (the bond point, or the zone centre on replay)
+function revealCompound(key, r, pos){
+  pos = pos || {fx:.5,fy:.5};
   const comp = document.createElement("div");
-  comp.className = "compound p-"+animClass(r.anim);
+  comp.className = "compound";
+  comp.style.left = pos.fx*100+"%"; comp.style.top = pos.fy*100+"%";
   comp.tabIndex = 0;
   comp.setAttribute("role","img");
   comp.setAttribute("aria-label", `${r.name}, ${r.form}. ${r.fact}`);
   comp.dataset.key = key;
   const dark = isDark(r.color);
   comp.innerHTML = `
-    <div class="blob" style="width:128px;height:128px">
-      <svg class="shape" viewBox="0 0 100 100" aria-hidden="true">
-        <path class="fillpop" d="${shapeFor(r.form)}" fill="${r.color}" stroke="none"/>
-        <path class="draw" d="${shapeFor(r.form)}" fill="none"/>
-      </svg>
-      <span class="sym ${r.form.length>2?'sm':''}" style="color:${dark?'#f3efe6':'var(--ink)'}">${r.form}</span>
-    </div>
-    <div class="cap"><span class="cname">${r.name}</span><span class="cform">${r.form}</span></div>`;
+    <div class="compound-inner p-${animClass(r.anim)}">
+      <div class="blob" style="width:128px;height:128px">
+        <svg class="shape" viewBox="0 0 100 100" aria-hidden="true">
+          <path class="fillpop" d="${shapeFor(r.form)}" fill="${r.color}" stroke="none"/>
+          <path class="draw" d="${shapeFor(r.form)}" fill="none"/>
+        </svg>
+        <span class="sym ${r.form.length>2?'sm':''}" style="color:${dark?'#f3efe6':'var(--ink)'}">${r.form}</span>
+      </div>
+      <div class="cap"><span class="cname">${r.name}</span><span class="cform">${r.form}</span></div>
+    </div>`;
   zone.appendChild(comp);
 
-  // attach the personality effects (particles / overlays)
-  applyEffect(r.anim, comp);
+  // personality effects (particles / overlays) attach to the inner, animating node
+  applyEffect(r.anim, comp.querySelector(".compound-inner"));
 
   // hover/focus on the compound shows its card
   attachCardEvents(comp, ()=>{ const rc=comp.getBoundingClientRect(); cardForKey(key, rc.left+rc.width/2, rc.top); });
@@ -810,7 +839,7 @@ function nobleGag(sym){
   const gag = NOBLE_GAG[sym];
   // find the blob for this noble in the zone (could be either slot)
   const slots = [...zone.querySelectorAll(".slot")];
-  const idx = state.zone.indexOf(sym);
+  const idx = state.zone.findIndex(it=>it.sym===sym);
   const target = slots[idx] || slots[0];
   const other = slots[idx===0?1:0];
   target?.querySelector(".blob")?.classList.remove("pulse");
@@ -876,9 +905,9 @@ function replay(key){
   if(state.busy) return;
   clearZone();
   zone.classList.add("busy","armed"); state.busy=true;
-  spawnBurst();
+  spawnBurst({fx:.5,fy:.5});
   setTimeout(()=>{
-    revealCompound(key, REACTIONS[key], true);
+    revealCompound(key, REACTIONS[key], {fx:.5,fy:.5});
     state.busy=false; state.resolved=true;
   }, 200);
 }
