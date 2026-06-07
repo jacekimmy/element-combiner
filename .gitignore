@@ -1,0 +1,5 @@
+# Local Claude Code tooling (dev-server config, worktrees) — not needed to deploy
+.claude/
+
+# OS cruft
+.DS_Store

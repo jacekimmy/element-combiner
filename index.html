@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Tiny Reactions — a little element lab</title>
+<meta name="description" content="Drag two elements together and watch them become something real. A curated little chemistry toy." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Shantell+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   TINY REACTIONS — crayon physics lab
+   One file. Curated, not simulated. Hand-drawn but premium.
+   ============================================================ */
+
+:root{
+  --paper:        #f7f2e7;
+  --paper-2:      #f1ead9;
+  --ink:          #33312c;
+  --ink-soft:     #6b675e;
+  --grid:         rgba(120,110,90,.10);
+  --shadow:       rgba(60,52,40,.22);
+
+  /* crayon palette */
+  --c-h:   #ef6f97;   /* hydrogen — tiny pink */
+  --c-o:   #4f93d6;   /* oxygen   — round blue */
+  --c-c:   #44413c;   /* carbon   — charcoal */
+  --c-n:   #6fa7a3;   /* nitrogen — calm teal */
+  --c-na:  #e8843c;   /* sodium   — jittery orange */
+  --c-cl:  #6fb84c;   /* chlorine — hazard green */
+  --c-mg:  #cfcad6;   /* magnesium— bright silver */
+  --c-fe:  #8a8f96;   /* iron     — steel grey */
+  --c-s:   #ecc23a;   /* sulfur   — yellow */
+  --c-au:  #e7b53c;   /* gold     — smug gold */
+  --c-he:  #c3a7e0;   /* helium   — floaty lilac */
+
+  --ease-bounce: cubic-bezier(.34,1.56,.64,1);
+  --ease-soft:   cubic-bezier(.22,.61,.36,1);
+}
+
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; height:100%; }
+body{
+  font-family:"Shantell Sans", ui-rounded, system-ui, sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--paper) 0%, var(--paper-2) 100%);
+  overflow-x:hidden;
+  position:relative;
+  min-height:100%;
+  touch-action:manipulation;
+}
+/* sketchbook paper: faint grid + grain */
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:28px 28px;
+  mask-image:radial-gradient(120% 100% at 50% 30%, #000 55%, transparent 100%);
+}
+body::after{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+.wrap{ position:relative; z-index:1; max-width:980px; margin:0 auto; padding:22px 18px 80px; }
+
+/* ---------- header ---------- */
+header{ text-align:center; margin:6px 0 8px; }
+h1{
+  font-size:clamp(30px,7vw,52px); font-weight:700; margin:0; letter-spacing:.5px;
+  transform:rotate(-1.2deg);
+}
+h1 .dot{ color:var(--c-o); }
+.tagline{ margin:2px 0 0; color:var(--ink-soft); font-weight:400; font-size:clamp(13px,3.4vw,17px); transform:rotate(.4deg); }
+
+/* counter */
+.counter{ margin:14px auto 0; max-width:340px; }
+.counter .num{ text-align:center; font-weight:600; font-size:16px; }
+.counter .num b{ color:var(--c-na); }
+.track{ position:relative; height:14px; margin-top:6px; }
+.track svg{ width:100%; height:100%; overflow:visible; display:block; }
+.track .base{ stroke:rgba(80,72,60,.28); stroke-width:5; stroke-linecap:round; fill:none; }
+.track .fill{ stroke:var(--c-cl); stroke-width:6; stroke-linecap:round; fill:none;
+  stroke-dasharray:1000; transition:stroke-dashoffset .7s var(--ease-soft); }
+
+/* ---------- reaction zone ---------- */
+.stage{ position:relative; margin:22px auto 8px; }
+.zone-wrap{ position:relative; display:flex; justify-content:center; }
+.zone{
+  position:relative; width:min(560px,92vw); height:min(340px,52vh); min-height:240px;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  border-radius:38px;
+}
+.zone .frame{ position:absolute; inset:0; pointer-events:none; }
+.zone .frame path{ fill:rgba(255,255,255,.32); stroke:var(--ink); stroke-width:2.4;
+  stroke-dasharray:9 11; stroke-linecap:round; filter:url(#boil1);
+  transition:stroke-width .25s, fill .3s; }
+.zone.armed .frame path{ stroke-dasharray:none; }
+.zone.over .frame path{ fill:rgba(111,184,76,.16); stroke-width:3.4; }
+.zone.over{ animation:inhale .4s var(--ease-soft); }
+@keyframes inhale{ 40%{ transform:scale(.985); } }
+
+.zone-hint{
+  position:absolute; left:0; right:0; top:50%; transform:translateY(-50%) rotate(-1deg);
+  text-align:center; color:var(--ink-soft); font-size:clamp(15px,4vw,20px); pointer-events:none;
+  transition:opacity .3s; padding:0 18px;
+}
+.zone-hint small{ display:block; font-size:13px; opacity:.7; margin-top:2px; }
+.zone.busy .zone-hint, .zone.armed .zone-hint{ opacity:0; }
+
+.slot{ position:relative; width:0; }
+.slot.show{ width:auto; }
+
+/* tiny floating dust/marks inside zone for life */
+.zone .speck{ position:absolute; width:4px; height:4px; border-radius:50%;
+  background:rgba(90,80,60,.18); pointer-events:none; }
+
+/* ---------- element blob (shared) ---------- */
+.blob{
+  position:relative; width:96px; height:96px; flex:0 0 auto;
+  display:grid; place-items:center; user-select:none;
+}
+.blob svg.shape{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.blob svg.shape path{ stroke:var(--ink); stroke-width:2.6; stroke-linejoin:round; }
+.blob .sym{ position:relative; font-weight:700; font-size:30px; color:var(--ink);
+  text-shadow:0 1px 0 rgba(255,255,255,.4); pointer-events:none; line-height:1; transform:rotate(-2deg); }
+.blob .sym.sm{ font-size:24px; }
+
+/* ---------- tray ---------- */
+.tray-label{ text-align:center; color:var(--ink-soft); margin:18px 0 6px; font-size:14px; transform:rotate(-.5deg); }
+.tray{
+  display:flex; flex-wrap:wrap; justify-content:center; gap:clamp(8px,2.6vw,18px);
+  max-width:760px; margin:0 auto;
+}
+.tile{
+  position:relative; border:0; background:transparent; padding:0; cursor:grab;
+  width:clamp(64px,17vw,84px); height:clamp(64px,17vw,84px);
+  display:grid; place-items:center; touch-action:none; outline:none;
+  transition:transform .22s var(--ease-bounce), filter .2s;
+}
+.tile .blob{ width:100%; height:100%; }
+.tile .blob .sym{ font-size:clamp(20px,5vw,27px); }
+.tile:hover, .tile:focus-visible{ transform:translateY(-7px) rotate(2deg) scale(1.06); }
+.tile:hover .shape path, .tile:focus-visible .shape path{ filter:url(#boil2); }
+.tile:focus-visible .blob::after{
+  content:""; position:absolute; inset:-9px; border-radius:50%;
+  border:2.5px dashed var(--c-o); animation:spin 9s linear infinite;
+}
+.tile.lift{ opacity:.28; transform:scale(.9); }       /* original while ghost is dragging */
+.tile.selected{ transform:translateY(-7px) scale(1.08); }
+.tile.selected .blob::after{
+  content:""; position:absolute; inset:-9px; border-radius:50%;
+  border:2.5px dashed var(--c-na); animation:spin 6s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* drag ghost */
+.ghost{
+  position:fixed; z-index:60; width:84px; height:84px; pointer-events:none;
+  left:0; top:0; margin:-42px 0 0 -42px;
+  transform:scale(1.12) rotate(-4deg); filter:drop-shadow(4px 9px 5px var(--shadow));
+}
+.ghost .blob .sym{ font-size:26px; }
+
+/* ---------- toast / message line ---------- */
+.toast{
+  position:fixed; left:50%; bottom:26px; transform:translate(-50%,18px);
+  background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:16px;
+  font-size:15px; font-weight:500; opacity:0; pointer-events:none; z-index:55;
+  transition:opacity .3s, transform .3s var(--ease-bounce); max-width:90vw; text-align:center;
+  box-shadow:0 6px 18px var(--shadow);
+}
+.toast.show{ opacity:1; transform:translate(-50%,0); }
+
+/* ---------- info card ---------- */
+.infocard{
+  position:fixed; z-index:58; width:248px; max-width:78vw; padding:13px 15px 14px;
+  background:#fffdf6; color:var(--ink); border-radius:16px; pointer-events:none;
+  opacity:0; transform:translateY(6px) rotate(-1deg) scale(.96); transition:opacity .18s, transform .18s var(--ease-bounce);
+  box-shadow:0 10px 26px var(--shadow); border:2px solid var(--ink);
+}
+.infocard.show{ opacity:1; transform:translateY(0) rotate(-1deg) scale(1); }
+.infocard .ic-top{ display:flex; align-items:baseline; gap:8px; }
+.infocard .ic-name{ font-weight:700; font-size:18px; }
+.infocard .ic-form{ color:var(--ink-soft); font-weight:600; font-size:15px; }
+.infocard .ic-fact{ margin-top:5px; font-weight:400; font-size:14px; line-height:1.32; color:#46423a; }
+.infocard .ic-pin{ position:absolute; top:-9px; left:18px; width:14px; height:14px; border-radius:50%;
+  background:var(--c-h); border:2px solid var(--ink); }
+
+/* ---------- discovery log ---------- */
+.log-head{ display:flex; align-items:center; justify-content:center; gap:10px; margin:38px 0 12px; }
+.log-head h2{ margin:0; font-size:22px; font-weight:700; transform:rotate(-1deg); }
+.reset{
+  border:2px solid var(--ink); background:#fffdf6; color:var(--ink); cursor:pointer;
+  font-family:inherit; font-weight:600; font-size:13px; padding:5px 12px; border-radius:13px;
+  transition:transform .15s var(--ease-bounce), background .2s;
+}
+.reset:hover{ transform:rotate(-2deg) scale(1.05); background:#fff; }
+.reset:active{ transform:scale(.94); }
+
+.log{ display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:12px; max-width:820px; margin:0 auto; }
+.card{
+  position:relative; aspect-ratio:1/1; border-radius:16px; background:rgba(255,255,255,.5);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  cursor:default; overflow:visible; padding:6px 4px;
+  border:2.4px dashed rgba(80,72,60,.4);
+  transition:transform .2s var(--ease-bounce);
+}
+.card.found{ cursor:pointer; background:#fffdf6; border-style:solid; border-color:var(--ink); }
+.card.found:hover, .card.found:focus-visible{ transform:translateY(-5px) rotate(-2deg) scale(1.05); outline:none; }
+.card .q{ font-size:34px; color:rgba(90,80,60,.4); font-weight:700; }
+.card .mini{ width:54%; height:54%; flex:0 0 auto; }
+.card .mini .blob{ width:100%; height:100%; }
+.card .mini .sym{ font-size:15px; }
+.card .clabel{ text-align:center; font-size:10.5px; line-height:1.08; font-weight:600; color:var(--ink-soft); }
+.card .newstamp{
+  position:absolute; top:-10px; right:-8px; background:var(--c-h); color:#fff; font-size:10px; font-weight:700;
+  padding:3px 7px; border-radius:9px; transform:rotate(8deg); border:2px solid var(--ink);
+  animation:stamp .5s var(--ease-bounce) both;
+}
+@keyframes stamp{ 0%{ transform:rotate(8deg) scale(2.4); opacity:0; } 60%{ transform:rotate(8deg) scale(.9); } 100%{ transform:rotate(8deg) scale(1); opacity:1; } }
+
+/* footer */
+footer{ text-align:center; margin-top:46px; color:var(--ink-soft); font-size:13px; font-weight:400; }
+footer a{ color:var(--ink); }
+
+/* ============================================================
+   COMBINE / REVEAL ANIMATIONS
+   ============================================================ */
+/* the two inputs drifting to bond */
+.bonding{ animation:driftIn .55s var(--ease-soft) forwards; }
+.bonding.left{ --dx:26px; } .bonding.right{ --dx:-26px; }
+@keyframes driftIn{ to{ transform:translateX(var(--dx)) scale(.86); opacity:.85; } }
+
+/* burst of hand-drawn spark lines on bond */
+.burst{ position:absolute; left:50%; top:50%; width:0; height:0; pointer-events:none; z-index:5; }
+.burst i{ position:absolute; left:0; top:0; width:3px; height:22px; background:var(--ink); border-radius:3px;
+  transform-origin:50% 0; transform:rotate(var(--a)) translateY(6px) scaleY(0); opacity:0; }
+.burst.go i{ animation:spark .5s var(--ease-bounce) forwards; }
+@keyframes spark{ 30%{ opacity:1; transform:rotate(var(--a)) translateY(6px) scaleY(1.1); }
+  100%{ opacity:0; transform:rotate(var(--a)) translateY(34px) scaleY(.2); } }
+
+/* the compound itself */
+.compound{ position:relative; display:grid; place-items:center; z-index:4; }
+.compound .blob{ width:128px; height:128px; }
+.compound .blob .sym{ font-size:30px; }
+.compound svg.shape path.draw{ stroke-dasharray:560; stroke-dashoffset:560; animation:draw .7s var(--ease-soft) .05s forwards; }
+@keyframes draw{ to{ stroke-dashoffset:0; } }
+.compound .blob .fillpop{ opacity:0; animation:fillpop .4s ease .5s forwards; }
+@keyframes fillpop{ to{ opacity:1; } }
+.compound .cap{
+  position:absolute; top:100%; left:50%; transform:translateX(-50%);
+  white-space:nowrap; text-align:center; margin-top:6px; opacity:0; animation:capIn .35s ease .55s forwards;
+}
+.compound .cap .cname{ font-weight:700; font-size:21px; display:block; }
+.compound .cap .cform{ color:var(--ink-soft); font-weight:600; font-size:15px; }
+@keyframes capIn{ from{ opacity:0; transform:translate(-50%,8px); } to{ opacity:1; transform:translate(-50%,0); } }
+
+/* ---- per-compound personalities (applied to .compound) ---- */
+/* water — plops down then wobbles */
+.p-water{ animation:p-plop 1.1s var(--ease-bounce) .5s both; }
+@keyframes p-plop{ 0%{ transform:translateY(-30px); } 55%{ transform:translateY(10px) scaleY(.86) scaleX(1.12); }
+  72%{ transform:translateY(0) scaleY(1.08) scaleX(.94); } 100%{ transform:translateY(0); } }
+/* salt — snaps crisp then glints */
+.p-salt{ animation:p-snap .5s var(--ease-bounce) .5s both; }
+@keyframes p-snap{ 0%{ transform:scale(.6) rotate(-12deg); } 60%{ transform:scale(1.12) rotate(4deg); } 100%{ transform:scale(1) rotate(0); } }
+/* co2 / o2 — rise gently */
+.p-rise{ animation:p-rise 2.6s ease-in-out .5s infinite alternate; }
+@keyframes p-rise{ from{ transform:translateY(4px); } to{ transform:translateY(-12px); } }
+/* hcl — fume jitter */
+.p-fume{ animation:p-fume 1.6s ease-in-out .5s infinite; }
+@keyframes p-fume{ 0%,100%{ transform:translate(0,0) rotate(0); } 25%{ transform:translate(1px,-3px) rotate(.6deg); } 50%{ transform:translate(-1px,-1px) rotate(-.6deg); } 75%{ transform:translate(1px,-4px) rotate(.4deg); } }
+/* ammonia / methane — wobble */
+.p-wobble{ animation:p-wobble 2.2s ease-in-out .5s infinite; }
+@keyframes p-wobble{ 0%,100%{ transform:rotate(-3deg); } 50%{ transform:rotate(3deg); } }
+/* mgo — handled by flash overlay; sits still bright */
+.p-flash{ animation:p-pulseBright 1.8s ease-in-out .9s infinite alternate; }
+@keyframes p-pulseBright{ from{ filter:brightness(1); } to{ filter:brightness(1.25); } }
+/* rust — creep + tiny crumble shake */
+.p-creep{ animation:p-crumble 3s ease-in-out .8s infinite; }
+@keyframes p-crumble{ 0%,100%{ transform:translateY(0) rotate(0); } 70%{ transform:translateY(0) rotate(0); } 85%{ transform:translateY(1px) rotate(.8deg); } 92%{ transform:translateY(0) rotate(-.6deg); } }
+/* diamond — squeeze then twinkle scale */
+.p-diamond{ animation:p-squeeze .8s var(--ease-bounce) .5s both; }
+@keyframes p-squeeze{ 0%{ transform:scaleX(1.3) scaleY(.7); } 45%{ transform:scaleX(.8) scaleY(1.18); } 70%{ transform:scale(1.06); } 100%{ transform:scale(1); } }
+/* so2 — puff */
+.p-puff{ animation:p-puff .9s var(--ease-bounce) .5s both; }
+@keyframes p-puff{ 0%{ transform:scale(.5); } 55%{ transform:scale(1.16); } 100%{ transform:scale(1); } }
+/* h2 — shoot up */
+.p-shoot{ animation:p-shoot 1.1s var(--ease-bounce) .5s both; }
+@keyframes p-shoot{ 0%{ transform:translateY(26px); } 55%{ transform:translateY(-14px) scaleY(1.1); } 100%{ transform:translateY(0); } }
+/* no2 — slow ugly drift */
+.p-drift{ animation:p-uglydrift 4s ease-in-out .6s infinite alternate; }
+@keyframes p-uglydrift{ from{ transform:translate(-4px,2px) rotate(-1deg); } to{ transform:translate(5px,-4px) rotate(1.5deg); } }
+
+/* effect overlays */
+.fx-flash{ position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:70; }
+.fx-flash.go{ animation:flashout 1.1s ease forwards; }
+@keyframes flashout{ 0%{ opacity:0; } 8%{ opacity:1; } 30%{ opacity:1; } 100%{ opacity:0; } }
+
+.haze{ position:absolute; left:50%; top:50%; width:140px; height:140px; border-radius:50%;
+  transform:translate(-50%,-50%) scale(.4); pointer-events:none; z-index:2; opacity:0; filter:blur(7px); }
+.haze.brown{ background:radial-gradient(circle, rgba(120,72,40,.6), transparent 70%); }
+.haze.green{ background:radial-gradient(circle, rgba(120,180,70,.55), transparent 70%); }
+.haze.go{ animation:hazeSpread 2.4s ease forwards; }
+@keyframes hazeSpread{ 0%{ opacity:0; transform:translate(-50%,-50%) scale(.4); }
+  35%{ opacity:.9; } 100%{ opacity:.5; transform:translate(-50%,-58%) scale(1.5); } }
+
+/* little particles: stink lines, sparkles, flame, spark */
+.particle{ position:absolute; pointer-events:none; z-index:6; }
+.stink{ width:3px; height:16px; border-radius:3px; background:var(--ink-soft); opacity:.0;
+  animation:stink 1.8s ease-in-out infinite; }
+@keyframes stink{ 0%{ opacity:0; transform:translateY(0) scaleY(.6); } 30%{ opacity:.55; } 100%{ opacity:0; transform:translateY(-26px) scaleY(1.1); } }
+.sparkle{ font-size:18px; opacity:0; animation:sparkle 1.4s ease-in-out infinite; }
+@keyframes sparkle{ 0%,100%{ opacity:0; transform:scale(.4) rotate(0); } 50%{ opacity:1; transform:scale(1) rotate(20deg); } }
+.flame{ width:14px; height:18px; border-radius:50% 50% 50% 50%/60% 60% 40% 40%;
+  background:linear-gradient(var(--c-na),var(--c-s)); transform-origin:50% 100%; animation:flame .35s ease-in-out infinite alternate; }
+@keyframes flame{ from{ transform:scaleY(.85) rotate(-4deg); } to{ transform:scaleY(1.12) rotate(4deg); } }
+.glint{ position:absolute; font-size:22px; opacity:0; }
+.glint.go{ animation:glint 1.1s ease forwards; }
+@keyframes glint{ 0%{ opacity:0; transform:scale(.2) rotate(-30deg); } 40%{ opacity:1; transform:scale(1.1) rotate(0); } 100%{ opacity:0; transform:scale(.8) rotate(20deg); } }
+
+/* noble gags */
+.gag-float{ animation:gagFloat 2.1s var(--ease-soft) forwards; }
+@keyframes gagFloat{ 0%{ transform:translateY(0) rotate(0); opacity:1; }
+  100%{ transform:translateY(-140vh) rotate(16deg); opacity:0; } }
+.balloon-string{ position:absolute; top:100%; left:50%; width:2px; height:46px; background:var(--ink-soft);
+  transform-origin:top; animation:sway 1.2s ease-in-out infinite alternate; }
+@keyframes sway{ from{ transform:translateX(-50%) rotate(-8deg); } to{ transform:translateX(-50%) rotate(8deg); } }
+.gag-shrug{ animation:gagShrug 1.5s var(--ease-bounce) forwards; }
+@keyframes gagShrug{ 0%{ transform:rotate(0); } 20%{ transform:rotate(-8deg) translateY(-4px); }
+  45%{ transform:rotate(8deg) translateY(-4px); } 70%{ transform:rotate(-4deg); } 100%{ transform:rotate(0); } }
+.nope{ position:absolute; top:-8px; right:-10px; font-weight:700; color:var(--ink); font-size:18px;
+  opacity:0; transform:rotate(-8deg); }
+.nope.go{ animation:nope 1.6s var(--ease-bounce) forwards; }
+@keyframes nope{ 0%{ opacity:0; transform:rotate(-8deg) scale(.3); } 30%{ opacity:1; transform:rotate(-8deg) scale(1.1); }
+  80%{ opacity:1; } 100%{ opacity:0; transform:rotate(-8deg) scale(1) translateY(-8px); } }
+
+/* wiggle for invalid */
+.wiggle{ animation:wiggle .5s ease both; }
+@keyframes wiggle{ 0%,100%{ transform:translateX(0) rotate(0); } 20%{ transform:translateX(-7px) rotate(-4deg); }
+  40%{ transform:translateX(7px) rotate(4deg); } 60%{ transform:translateX(-5px) rotate(-2deg); } 80%{ transform:translateX(4px) rotate(2deg); } }
+
+/* win confetti */
+.confetti{ position:fixed; top:-12px; width:11px; height:15px; z-index:65; pointer-events:none; border-radius:2px;
+  animation:fall linear forwards; }
+@keyframes fall{ to{ transform:translateY(108vh) rotate(540deg); } }
+
+/* drop-in entrance for a slot blob */
+.dropin{ animation:dropin .45s var(--ease-bounce) both; }
+@keyframes dropin{ 0%{ transform:translateY(-46px) scale(.7) rotate(-8deg); opacity:0; }
+  60%{ transform:translateY(4px) scale(1.06); } 100%{ transform:translateY(0) scale(1); opacity:1; } }
+.pulse{ animation:pulse 1.5s ease-in-out infinite; }
+@keyframes pulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.06); } }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.001s !important; animation-iteration-count:1 !important; }
+  .zone .frame path, .tile:hover .shape path{ filter:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- hand-drawn "boil" filters: subtle line wobble that makes edges feel alive -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="boil1"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/></filter>
+  <filter id="boil2"><feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="4"/></filter>
+</svg>
+
+<div class="wrap">
+  <header>
+    <h1>Tiny Reactions<span class="dot">.</span></h1>
+    <p class="tagline">Drag two elements together. See what they become.</p>
+
+    <div class="counter">
+      <div class="num">Discovered <b id="count">0</b> of 13</div>
+      <div class="track">
+        <svg viewBox="0 0 300 14" preserveAspectRatio="none">
+          <path class="base" d="M3 7 Q 80 2, 150 8 T 297 7"/>
+          <path class="fill" id="progFill" d="M3 7 Q 80 2, 150 8 T 297 7"/>
+        </svg>
+      </div>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="zone-wrap">
+      <div class="zone" id="zone" role="group" aria-label="Reaction zone. Drag or tap two elements here to combine.">
+        <svg class="frame" viewBox="0 0 560 340" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M40 30 Q 280 12, 520 30 Q 540 170, 520 312 Q 280 330, 40 312 Q 20 170, 40 30 Z"/>
+        </svg>
+        <div class="zone-hint" id="zoneHint">drop two elements here<small>or tap one, then tap here</small></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="tray-label">your elements — drag one out, or tap to pick</p>
+  <div class="tray" id="tray" role="list" aria-label="Element tray"></div>
+
+  <div class="log-head">
+    <h2>Discovery Log</h2>
+    <button class="reset" id="resetBtn" type="button">clear the zone</button>
+  </div>
+  <div class="log" id="log" aria-label="Discovered compounds"></div>
+
+  <footer>
+    A curated little chemistry toy. Eleven elements, thirteen real compounds, two that refuse to react.
+  </footer>
+</div>
+
+<div class="infocard" id="infocard" role="tooltip" aria-hidden="true">
+  <span class="ic-pin"></span>
+  <div class="ic-top"><span class="ic-name"></span><span class="ic-form"></span></div>
+  <div class="ic-fact"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* =========================================================================
+   DATA — curated, not simulated.
+   ========================================================================= */
+const ELEMENTS = [
+  { sym:"H",  name:"Hydrogen",  type:"reactive", color:"var(--c-h)",  size:.72, fact:"The lightest element and the most common stuff in the universe.", form:"H" },
+  { sym:"O",  name:"Oxygen",    type:"reactive", color:"var(--c-o)",  size:1,   fact:"Eager to bond — it's why iron rusts and fires burn.", form:"O" },
+  { sym:"C",  name:"Carbon",    type:"reactive", color:"var(--c-c)",  size:.96, fact:"The backbone of every living thing you've ever met.", form:"C", dark:true },
+  { sym:"N",  name:"Nitrogen",  type:"reactive", color:"var(--c-n)",  size:.94, fact:"Calm and unreactive — it makes up most of the air you breathe.", form:"N" },
+  { sym:"Na", name:"Sodium",    type:"reactive", color:"var(--c-na)", size:.92, fact:"So jittery it bursts into flame the moment it touches water.", form:"Na" },
+  { sym:"Cl", name:"Chlorine",  type:"reactive", color:"var(--c-cl)", size:.96, fact:"A green, choking gas on its own — genuinely poisonous.", form:"Cl" },
+  { sym:"Mg", name:"Magnesium", type:"reactive", color:"var(--c-mg)", size:.98, fact:"Burns with a blinding white light that's hard to put out.", form:"Mg" },
+  { sym:"Fe", name:"Iron",      type:"reactive", color:"var(--c-fe)", size:1.02,fact:"Heavy, metallic, and the core of our whole planet.", form:"Fe" },
+  { sym:"S",  name:"Sulfur",    type:"reactive", color:"var(--c-s)",  size:.94, fact:"Bright yellow and famous for its rotten-egg smell.", form:"S" },
+  { sym:"Au", name:"Gold",      type:"noble",    color:"var(--c-au)", size:.98, fact:"Gold barely reacts with anything, which is why ancient gold jewelry still shines today.", form:"Au" },
+  { sym:"He", name:"Helium",    type:"noble",    color:"var(--c-he)", size:.78, fact:"Helium reacts with nothing, and it was discovered in the Sun before it was ever found on Earth.", form:"He" },
+];
+const ELEM = Object.fromEntries(ELEMENTS.map(e=>[e.sym,e]));
+
+/* reactions keyed by the two symbols sorted alphabetically, joined by "+" */
+function keyOf(a,b){ return [a,b].sort().join("+"); }
+const REACTIONS = {
+  "H+O":  { name:"Water",            form:"H₂O",   color:"var(--c-o)",  anim:"water",  fact:"Water is the only common thing that is lighter as a solid than a liquid, which is why ice floats." },
+  "Cl+Na":{ name:"Table Salt",       form:"NaCl",  color:"#e9e3d2",     anim:"salt",   fact:"Sodium explodes in water and chlorine is poison gas, but bonded together they season your fries." },
+  "C+O":  { name:"Carbon Dioxide",   form:"CO₂",   color:"#b9c2c8",     anim:"co2",    fact:"This is what makes soda fizzy and what plants breathe in to grow." },
+  "Cl+H": { name:"Hydrochloric Acid",form:"HCl",   color:"#cfe07a",     anim:"hcl",    fact:"Your stomach makes acid this strong, and only a mucus lining stops it from digesting you." },
+  "H+N":  { name:"Ammonia",          form:"NH₃",   color:"#9fd0cb",     anim:"ammonia",fact:"The fertilizer made from ammonia feeds roughly half the people on Earth." },
+  "C+H":  { name:"Methane",          form:"CH₄",   color:"#e8a35c",     anim:"methane",fact:"Methane is natural gas, and cows burp out enough of it to be a real climate problem." },
+  "Mg+O": { name:"Magnesium Oxide",  form:"MgO",   color:"#efeef2",     anim:"mgo",    fact:"Burning magnesium is so bright it powered the first camera flashes." },
+  "Fe+O": { name:"Rust",             form:"Fe₂O₃", color:"#b5612d",     anim:"rust",   fact:"Rust is just iron slowly breathing in oxygen. The same reaction, sped way up, is fire." },
+  "C+C":  { name:"Diamond",          form:"C",     color:"#dff1fb",     anim:"diamond",fact:"Diamond and pencil lead are both pure carbon. The only difference is how the atoms stack." },
+  "O+S":  { name:"Sulfur Dioxide",   form:"SO₂",   color:"#c9d471",     anim:"so2",    fact:"This is the sharp smell of a freshly struck match and of volcanoes." },
+  "H+H":  { name:"Hydrogen Gas",     form:"H₂",    color:"#f4b9cd",     anim:"h2",     fact:"Hydrogen is the lightest element and the most common stuff in the universe. Stars are giant balls of it." },
+  "N+O":  { name:"Nitrogen Dioxide", form:"NO₂",   color:"#a9763f",     anim:"no2",    fact:"This brown gas is the haze you see hanging in smog over big cities." },
+  "O+O":  { name:"Oxygen Gas",       form:"O₂",    color:"#7fb6e6",     anim:"o2",     fact:"It takes two oxygen atoms joined together to make the air you actually breathe." },
+};
+const ORDER = Object.keys(REACTIONS); // stable order for the log grid
+
+const NOBLE_GAG = {
+  Au: { kind:"shrug", fact:ELEM.Au.fact },
+  He: { kind:"float", fact:ELEM.He.fact },
+};
+
+/* a few hand-drawn-ish blob outlines (100x100). picked by symbol for variety */
+const SHAPES = [
+  "M50 7 C 74 5, 95 26, 92 50 C 95 74, 72 95, 49 92 C 25 95, 6 72, 9 49 C 6 26, 27 8, 50 7 Z",
+  "M50 9 C 70 6, 92 22, 91 47 C 96 70, 73 94, 50 91 C 27 95, 8 73, 10 49 C 5 27, 30 11, 50 9 Z",
+  "M52 6 C 78 9, 94 30, 90 52 C 93 76, 68 93, 47 91 C 23 93, 8 69, 11 47 C 9 24, 29 8, 52 6 Z",
+];
+function shapeFor(sym){ let h=0; for(const c of sym) h+=c.charCodeAt(0); return SHAPES[h%SHAPES.length]; }
+
+/* =========================================================================
+   BLOB RENDERING
+   ========================================================================= */
+function blobHTML(color, sym, opts={}){
+  const dark = opts.dark;
+  const scale = opts.size || 1;
+  const drawClass = opts.draw ? "draw" : "";
+  const fillClass = opts.draw ? "fillpop" : "";
+  const path = shapeFor(sym);
+  const txt = dark ? "#f3efe6" : "var(--ink)";
+  const symCls = sym.length>1 ? "sym sm" : "sym";
+  return `
+    <div class="blob" style="transform:scale(${scale})">
+      <svg class="shape" viewBox="0 0 100 100" aria-hidden="true">
+        <path class="${fillClass}" d="${path}" fill="${color}" stroke="none"/>
+        <path class="${drawClass}" d="${path}" fill="none"/>
+      </svg>
+      <span class="${symCls}" style="color:${txt}">${sym}</span>
+    </div>`;
+}
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+const state = {
+  zone: [],          // symbols currently placed (0,1,2)
+  resolved: false,   // a result is showing
+  busy: false,       // mid-animation, ignore input
+  found: new Set(),  // discovered reaction keys
+};
+const LS_KEY = "tinyreactions.found.v1";
+try{ const saved = JSON.parse(localStorage.getItem(LS_KEY)||"[]");
+     saved.forEach(k=>{ if(REACTIONS[k]) state.found.add(k); }); }catch(e){}
+
+const $ = s=>document.querySelector(s);
+const zone = $("#zone"), zoneHint = $("#zoneHint"), tray = $("#tray"),
+      logEl = $("#log"), toastEl = $("#toast"), card = $("#infocard"),
+      countEl = $("#count"), progFill = $("#progFill");
+
+/* =========================================================================
+   TRAY
+   ========================================================================= */
+ELEMENTS.forEach(e=>{
+  const b = document.createElement("button");
+  b.className = "tile"; b.type="button"; b.dataset.sym = e.sym;
+  b.setAttribute("role","listitem");
+  b.setAttribute("aria-label", `${e.name}, symbol ${e.sym}. ${e.type==="noble"?"A noble element.":""} Activate to place in the reaction zone.`);
+  b.innerHTML = blobHTML(e.color, e.sym, {dark:e.dark, size:e.size});
+  tray.appendChild(b);
+});
+
+/* =========================================================================
+   INFO CARD (hover / focus / tap)
+   ========================================================================= */
+let cardHideT;
+function showCard(x,y,name,form,fact){
+  card.querySelector(".ic-name").textContent = name;
+  card.querySelector(".ic-form").textContent = form;
+  card.querySelector(".ic-fact").textContent = fact;
+  card.setAttribute("aria-hidden","false");
+  card.classList.add("show");
+  // position: prefer above-right of the point, clamp to viewport
+  const w = 248, vw = innerWidth, vh = innerHeight;
+  let left = x + 16, top = y - 20;
+  if(left + w > vw - 8) left = x - w - 16;
+  if(left < 8) left = 8;
+  if(top + 120 > vh - 8) top = vh - 128;
+  if(top < 8) top = 8;
+  card.style.left = left+"px"; card.style.top = top+"px";
+  clearTimeout(cardHideT);
+}
+function hideCard(){ card.classList.remove("show"); card.setAttribute("aria-hidden","true"); }
+function cardForSym(sym, x, y){ const e=ELEM[sym]; showCard(x,y,e.name,e.form,e.fact); }
+function cardForKey(key, x, y){ const r=REACTIONS[key]; showCard(x,y,r.name,r.form,r.fact); }
+
+/* =========================================================================
+   TOAST
+   ========================================================================= */
+let toastT;
+function toast(msg, ms=2200){
+  toastEl.textContent = msg; toastEl.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(()=>toastEl.classList.remove("show"), ms);
+}
+
+/* =========================================================================
+   POINTER DRAG  +  TAP-TO-SELECT  (unified)
+   ========================================================================= */
+let drag = null; // {sym, ghost, tile, moved, startX, startY}
+
+tray.addEventListener("pointerdown", e=>{
+  const tile = e.target.closest(".tile"); if(!tile) return;
+  if(state.busy) return;
+  const sym = tile.dataset.sym;
+  drag = { sym, tile, moved:false, startX:e.clientX, startY:e.clientY, ghost:null, captured:false };
+  tile.setPointerCapture?.(e.pointerId);
+});
+
+tray.addEventListener("pointermove", e=>{
+  if(!drag) return;
+  const dx = e.clientX-drag.startX, dy = e.clientY-drag.startY;
+  if(!drag.moved && Math.hypot(dx,dy) > 7){
+    drag.moved = true;
+    // spawn ghost
+    const g = document.createElement("div"); g.className="ghost";
+    const el = ELEM[drag.sym];
+    g.innerHTML = blobHTML(el.color, el.sym, {dark:el.dark, size:el.size});
+    document.body.appendChild(g);
+    drag.ghost = g; drag.tile.classList.add("lift");
+    hideCard();
+  }
+  if(drag.moved){
+    drag.ghost.style.left = e.clientX+"px";
+    drag.ghost.style.top = e.clientY+"px";
+    const overZone = isOverZone(e.clientX,e.clientY);
+    zone.classList.toggle("over", overZone && state.zone.length<2);
+    // tilt toward motion
+    drag.ghost.style.transform = `scale(1.12) rotate(${Math.max(-12,Math.min(12,dx*0.06))}deg)`;
+  }
+});
+
+function endDrag(e){
+  if(!drag) return;
+  const d = drag; drag = null;
+  zone.classList.remove("over");
+  if(d.ghost){
+    const overZone = isOverZone(e.clientX,e.clientY);
+    d.ghost.remove(); d.tile.classList.remove("lift");
+    if(overZone){ placeElement(d.sym); }
+  } else {
+    // it was a tap, not a drag → tap-to-select behaviour
+    handleTap(d.sym, d.tile, e);
+  }
+}
+tray.addEventListener("pointerup", endDrag);
+tray.addEventListener("pointercancel", e=>{ if(drag){ drag.ghost?.remove(); drag.tile.classList.remove("lift"); drag=null; zone.classList.remove("over"); }});
+
+function isOverZone(x,y){
+  const r = zone.getBoundingClientRect();
+  const pad = 30; // generous hit area, mobile-friendly
+  return x>r.left-pad && x<r.right+pad && y>r.top-pad && y<r.bottom+pad;
+}
+
+/* tap on a tile: select it (and place if zone is the obvious next move) */
+/* A tap on a tile places it straight into the zone — tap two and they combine.
+   This matches the natural instinct on phones better than tap-select-then-tap-zone,
+   and we still flash the fun-fact card so the fact stays reachable by tap. */
+function handleTap(sym, tile, e){
+  if(state.busy) return;
+  const r = tile.getBoundingClientRect();
+  cardForSym(sym, r.left+r.width/2, r.top);
+  clearTimeout(cardHideT); cardHideT = setTimeout(hideCard, 1800);
+  // brief acknowledging lift on the tapped tile
+  tile.classList.add("selected"); setTimeout(()=>tile.classList.remove("selected"), 220);
+  placeElement(sym);
+}
+function clearSelection(){
+  document.querySelectorAll(".tile.selected").forEach(t=>t.classList.remove("selected"));
+}
+
+/* tapping the zone when a result is showing clears it for the next pair */
+zone.addEventListener("click", ()=>{
+  if(state.busy) return;
+  if(state.resolved){ clearZone(); }
+});
+
+/* =========================================================================
+   PLACE / RESOLVE
+   ========================================================================= */
+function placeElement(sym){
+  if(state.busy) return;
+  if(state.resolved){ clearZone(); }
+  if(state.zone.length>=2) return;
+
+  state.zone.push(sym);
+  renderZone();
+  zone.classList.add("armed");
+
+  if(state.zone.length===1){
+    zoneHint.style.opacity = 0;
+  } else if(state.zone.length===2){
+    state.busy = true;
+    setTimeout(resolve, 480);
+  }
+}
+
+function renderZone(){
+  // keep frame + hint, render slots
+  [...zone.querySelectorAll(".slot,.compound,.burst,.haze,.particle,.glint")].forEach(n=>n.remove());
+  state.zone.forEach((sym,i)=>{
+    const el = ELEM[sym];
+    const slot = document.createElement("div");
+    slot.className = "slot show";
+    slot.innerHTML = blobHTML(el.color, el.sym, {dark:el.dark, size:el.size});
+    const blob = slot.querySelector(".blob");
+    blob.classList.add("dropin");
+    if(state.zone.length===1) blob.classList.add("pulse");
+    blob.dataset.slot = i;
+    zone.appendChild(slot);
+  });
+}
+
+function resolve(){
+  const [a,b] = state.zone;
+  const ea = ELEM[a], eb = ELEM[b];
+
+  // noble easter eggs win over everything; first-placed noble wins
+  if(ea.type==="noble" || eb.type==="noble"){
+    const nobleSym = ea.type==="noble" ? a : b;
+    return nobleGag(nobleSym);
+  }
+  const key = keyOf(a,b);
+  const r = REACTIONS[key];
+  if(r){ validCombine(key, r); }
+  else { invalid(); }
+}
+
+/* =========================================================================
+   VALID COMBINE → reveal
+   ========================================================================= */
+function validCombine(key, r){
+  zone.classList.add("busy");
+  const slots = zone.querySelectorAll(".slot .blob");
+  slots[0]?.parentElement.classList.add("bonding","left");
+  slots[1]?.parentElement.classList.add("bonding","right");
+  slots.forEach(s=>s.classList.remove("pulse"));
+
+  // spark burst at center
+  setTimeout(()=>spawnBurst(), 360);
+
+  setTimeout(()=>{
+    [...zone.querySelectorAll(".slot")].forEach(n=>n.remove());
+    revealCompound(key, r, false);
+    const isNew = !state.found.has(key);
+    if(isNew){
+      state.found.add(key); saveFound(); updateCount();
+      celebrate(key);
+    }
+    renderLog();
+    state.busy = false; state.resolved = true;
+  }, 620);
+}
+
+function spawnBurst(){
+  const burst = document.createElement("div"); burst.className="burst";
+  for(let i=0;i<10;i++){ const s=document.createElement("i"); s.style.setProperty("--a",(i*36)+"deg"); burst.appendChild(s); }
+  zone.appendChild(burst);
+  requestAnimationFrame(()=>burst.classList.add("go"));
+  setTimeout(()=>burst.remove(), 700);
+}
+
+function revealCompound(key, r, replay){
+  const comp = document.createElement("div");
+  comp.className = "compound p-"+animClass(r.anim);
+  comp.tabIndex = 0;
+  comp.setAttribute("role","img");
+  comp.setAttribute("aria-label", `${r.name}, ${r.form}. ${r.fact}`);
+  comp.dataset.key = key;
+  const dark = isDark(r.color);
+  comp.innerHTML = `
+    <div class="blob" style="width:128px;height:128px">
+      <svg class="shape" viewBox="0 0 100 100" aria-hidden="true">
+        <path class="fillpop" d="${shapeFor(r.form)}" fill="${r.color}" stroke="none"/>
+        <path class="draw" d="${shapeFor(r.form)}" fill="none"/>
+      </svg>
+      <span class="sym ${r.form.length>2?'sm':''}" style="color:${dark?'#f3efe6':'var(--ink)'}">${r.form}</span>
+    </div>
+    <div class="cap"><span class="cname">${r.name}</span><span class="cform">${r.form}</span></div>`;
+  zone.appendChild(comp);
+
+  // attach the personality effects (particles / overlays)
+  applyEffect(r.anim, comp);
+
+  // hover/focus on the compound shows its card
+  attachCardEvents(comp, ()=>{ const rc=comp.getBoundingClientRect(); cardForKey(key, rc.left+rc.width/2, rc.top); });
+}
+
+function animClass(a){
+  return ({ water:"water", salt:"salt", co2:"rise", o2:"rise", hcl:"fume",
+    ammonia:"wobble", methane:"wobble", mgo:"flash", rust:"creep", diamond:"diamond",
+    so2:"puff", h2:"shoot", no2:"drift" })[a] || "salt";
+}
+// dark fills (charcoal/rust/steel) need light text on top
+function isDark(c){ return ["var(--c-c)","#b5612d","#a9763f"].includes(c); }
+
+/* per-animation particle/overlay flourishes */
+function applyEffect(anim, comp){
+  const add = (cls, html, style)=>{ const p=document.createElement("div"); p.className=cls; if(html)p.innerHTML=html; if(style)p.style.cssText+=style; comp.appendChild(p); return p; };
+  switch(anim){
+    case "mgo": {
+      const f = document.createElement("div"); f.className="fx-flash"; document.body.appendChild(f);
+      requestAnimationFrame(()=>f.classList.add("go")); setTimeout(()=>f.remove(),1200);
+      break;
+    }
+    case "salt": case "diamond": {
+      const g = add("glint", "✦", "position:absolute;top:6px;right:18px;color:#fff;");
+      requestAnimationFrame(()=>g.classList.add("go"));
+      const g2 = add("glint","✦","position:absolute;bottom:24px;left:14px;color:#fff;font-size:16px;");
+      setTimeout(()=>g2.classList.add("go"),300);
+      break;
+    }
+    case "ammonia": case "so2": {
+      for(let i=0;i<3;i++) add("particle stink", "", `left:${44+i*8}%;top:14%;animation-delay:${i*.3}s;`);
+      break;
+    }
+    case "hcl": {
+      for(let i=0;i<2;i++) add("particle stink", "", `left:${48+i*6}%;top:16%;animation-delay:${i*.4}s;background:var(--c-cl);`);
+      break;
+    }
+    case "methane": {
+      const fl = add("particle flame","", "left:50%;top:6%;transform:translateX(-50%);");
+      break;
+    }
+    case "h2": {
+      const g = add("glint","✶","position:absolute;top:-6px;left:50%;transform:translateX(-50%);color:var(--c-h);");
+      requestAnimationFrame(()=>g.classList.add("go"));
+      break;
+    }
+    case "no2": { const h=add("haze brown"); requestAnimationFrame(()=>h.classList.add("go")); break; }
+    case "so2-haze": { const h=add("haze green"); requestAnimationFrame(()=>h.classList.add("go")); break; }
+    case "rust": {
+      const g = add("glint","✦","position:absolute;top:10px;left:10px;color:#7a3f1d;font-size:14px;opacity:.6;");
+      break;
+    }
+  }
+  if(anim==="so2"){ const h=document.createElement("div"); h.className="haze green"; comp.appendChild(h); requestAnimationFrame(()=>h.classList.add("go")); }
+  if(anim==="co2"){ const g=document.createElement("div"); g.className="glint"; g.textContent="○"; g.style.cssText+="position:absolute;top:0;left:60%;color:#9aa;"; comp.appendChild(g); requestAnimationFrame(()=>g.classList.add("go")); }
+}
+
+/* =========================================================================
+   INVALID + NOBLE GAGS
+   ========================================================================= */
+function invalid(){
+  zone.querySelectorAll(".slot .blob").forEach(b=>{ b.classList.remove("pulse"); b.classList.add("wiggle"); });
+  toast("These two don't react. Try another pair.");
+  setTimeout(()=>{ clearZone(); }, 950);
+}
+
+function nobleGag(sym){
+  zone.classList.add("busy");
+  const gag = NOBLE_GAG[sym];
+  // find the blob for this noble in the zone (could be either slot)
+  const slots = [...zone.querySelectorAll(".slot")];
+  const idx = state.zone.indexOf(sym);
+  const target = slots[idx] || slots[0];
+  const other = slots[idx===0?1:0];
+  target?.querySelector(".blob")?.classList.remove("pulse");
+
+  if(gag.kind==="float"){
+    const blob = target.querySelector(".blob");
+    const str = document.createElement("div"); str.className="balloon-string"; blob.appendChild(str);
+    blob.classList.add("gag-float");
+    other?.querySelector(".blob")?.classList.add("wiggle");
+    toast("Helium floats off — it won't bond with anything.");
+  } else {
+    const blob = target.querySelector(".blob");
+    blob.classList.add("gag-shrug");
+    const nope = document.createElement("div"); nope.className="nope"; nope.textContent="nope ✦"; blob.appendChild(nope);
+    requestAnimationFrame(()=>nope.classList.add("go"));
+    other?.querySelector(".blob")?.classList.add("wiggle");
+    toast("Gold just shrugs. It refuses to react.");
+  }
+  setTimeout(()=>{ clearZone(); }, 1700);
+}
+
+/* =========================================================================
+   CLEAR / RESET
+   ========================================================================= */
+function clearZone(){
+  state.zone = []; state.resolved=false; state.busy=false;
+  clearSelection();
+  [...zone.querySelectorAll(".slot,.compound,.burst,.haze,.particle,.glint")].forEach(n=>n.remove());
+  zone.classList.remove("busy","armed","over");
+  zoneHint.style.opacity = "";
+}
+$("#resetBtn").addEventListener("click", clearZone);
+
+/* =========================================================================
+   DISCOVERY LOG
+   ========================================================================= */
+let newlyFound = null;
+function renderLog(){
+  logEl.innerHTML = "";
+  ORDER.forEach(key=>{
+    const r = REACTIONS[key];
+    const found = state.found.has(key);
+    const c = document.createElement(found ? "button" : "div");
+    c.className = "card" + (found?" found":"");
+    if(found){
+      c.type="button";
+      c.setAttribute("aria-label", `${r.name}, ${r.form}. ${r.fact} Activate to replay.`);
+      const dark = isDark(r.color);
+      c.innerHTML = `<div class="mini">${blobHTML(r.color, r.form, {dark}).replace('class="blob"','class="blob mini-inner"')}</div>
+        <span class="clabel">${r.name}</span>`;
+      if(key===newlyFound){ const s=document.createElement("div"); s.className="newstamp"; s.textContent="NEW!"; c.appendChild(s); }
+      c.addEventListener("click", ()=>replay(key));
+      attachCardEvents(c, ()=>{ const rc=c.getBoundingClientRect(); cardForKey(key, rc.left+rc.width/2, rc.top); });
+    } else {
+      c.setAttribute("aria-label","Undiscovered compound");
+      c.innerHTML = `<span class="q">?</span>`;
+    }
+    logEl.appendChild(c);
+  });
+  newlyFound = null;
+}
+function replay(key){
+  if(state.busy) return;
+  clearZone();
+  zone.classList.add("busy","armed"); state.busy=true;
+  spawnBurst();
+  setTimeout(()=>{
+    revealCompound(key, REACTIONS[key], true);
+    state.busy=false; state.resolved=true;
+  }, 200);
+}
+
+function updateCount(){
+  const n = state.found.size;
+  countEl.textContent = n;
+  // progress: dashoffset from full(1000) to ~0
+  const frac = n/13;
+  const len = progFill.getTotalLength ? progFill.getTotalLength() : 300;
+  progFill.style.strokeDasharray = len;
+  progFill.style.strokeDashoffset = len*(1-frac);
+  if(n===13){ winState(); }
+}
+function saveFound(){ try{ localStorage.setItem(LS_KEY, JSON.stringify([...state.found])); }catch(e){} }
+
+/* =========================================================================
+   CELEBRATIONS
+   ========================================================================= */
+function celebrate(key){
+  newlyFound = key;
+  // small confetti pop
+  const colors = ["var(--c-h)","var(--c-o)","var(--c-cl)","var(--c-na)","var(--c-s)"];
+  for(let i=0;i<14;i++){
+    const c = document.createElement("div"); c.className="confetti";
+    c.style.left = (40+Math.random()*20)+"vw";
+    c.style.background = colors[i%colors.length];
+    c.style.animationDuration = (1.1+Math.random()*0.7)+"s";
+    c.style.setProperty("transform","rotate("+(Math.random()*90)+"deg)");
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(), 2000);
+  }
+  // gentle replay nudge for the magnesium one
+  const n = state.found.size;
+  if(n>=4 && n<13 && !state.found.has("Mg+O") && !nudged){
+    nudged = true;
+    setTimeout(()=>toast("Psst — most people miss the magnesium one.", 3000), 1400);
+  }
+}
+let nudged = false;
+
+function winState(){
+  setTimeout(()=>{
+    toast("You found all 13. The whole little universe. ✦", 4000);
+    const colors = ["var(--c-h)","var(--c-o)","var(--c-cl)","var(--c-na)","var(--c-s)","var(--c-au)"];
+    for(let i=0;i<60;i++){
+      const c = document.createElement("div"); c.className="confetti";
+      c.style.left = (Math.random()*100)+"vw";
+      c.style.background = colors[i%colors.length];
+      c.style.animationDuration = (1.4+Math.random()*1.4)+"s";
+      c.style.animationDelay = (Math.random()*0.6)+"s";
+      document.body.appendChild(c);
+      setTimeout(()=>c.remove(), 3200);
+    }
+  }, 500);
+}
+
+/* =========================================================================
+   CARD EVENTS (hover/focus) for tiles, compounds, log cards
+   ========================================================================= */
+function attachCardEvents(el, show){
+  el.addEventListener("pointerenter", e=>{ if(e.pointerType==="mouse") show(); });
+  el.addEventListener("pointerleave", e=>{ if(e.pointerType==="mouse") hideCard(); });
+  el.addEventListener("focus", show);
+  el.addEventListener("blur", hideCard);
+}
+// tray tiles: hover/focus card
+tray.querySelectorAll(".tile").forEach(t=>{
+  const sym = t.dataset.sym;
+  attachCardEvents(t, ()=>{ const r=t.getBoundingClientRect(); cardForSym(sym, r.left+r.width/2, r.top); });
+});
+
+/* dismiss card on scroll/elsewhere tap */
+addEventListener("scroll", hideCard, {passive:true});
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+updateCount();
+renderLog();
+</script>
+
+<!-- Vercel Web Analytics (static-site flavor). Only resolves on the deployed
+     Vercel site; locally it 404s harmlessly. Enable Web Analytics in the Vercel
+     dashboard (Analytics tab → Enable) for it to start collecting. -->
+<script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>
