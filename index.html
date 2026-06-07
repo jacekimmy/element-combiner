@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Tiny Reactions — a little element lab</title>
+<title>Tiny Reactions, a little element lab</title>
 <meta name="description" content="Drag two elements together and watch them become something real. A curated little chemistry toy." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Shantell+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet" />
 <style>
 /* ============================================================
-   TINY REACTIONS — crayon physics lab
+   TINY REACTIONS, crayon physics lab
    One file. Curated, not simulated. Hand-drawn but premium.
    ============================================================ */
 
@@ -23,17 +23,17 @@
   --shadow:       rgba(60,52,40,.22);
 
   /* crayon palette */
-  --c-h:   #ef6f97;   /* hydrogen — tiny pink */
-  --c-o:   #4f93d6;   /* oxygen   — round blue */
-  --c-c:   #44413c;   /* carbon   — charcoal */
-  --c-n:   #6fa7a3;   /* nitrogen — calm teal */
-  --c-na:  #e8843c;   /* sodium   — jittery orange */
-  --c-cl:  #6fb84c;   /* chlorine — hazard green */
-  --c-mg:  #cfcad6;   /* magnesium— bright silver */
-  --c-fe:  #8a8f96;   /* iron     — steel grey */
-  --c-s:   #ecc23a;   /* sulfur   — yellow */
-  --c-au:  #e7b53c;   /* gold     — smug gold */
-  --c-he:  #c3a7e0;   /* helium   — floaty lilac */
+  --c-h:   #ef6f97;   /* hydrogen, tiny pink */
+  --c-o:   #4f93d6;   /* oxygen, round blue */
+  --c-c:   #44413c;   /* carbon, charcoal */
+  --c-n:   #6fa7a3;   /* nitrogen, calm teal */
+  --c-na:  #e8843c;   /* sodium, jittery orange */
+  --c-cl:  #6fb84c;   /* chlorine, hazard green */
+  --c-mg:  #cfcad6;   /* magnesium, bright silver */
+  --c-fe:  #8a8f96;   /* iron, steel grey */
+  --c-s:   #ecc23a;   /* sulfur, yellow */
+  --c-au:  #e7b53c;   /* gold, smug gold */
+  --c-he:  #c3a7e0;   /* helium, floaty lilac */
 
   --ease-bounce: cubic-bezier(.34,1.56,.64,1);
   --ease-soft:   cubic-bezier(.22,.61,.36,1);
@@ -262,38 +262,38 @@ footer a{ color:var(--ink); }
 @keyframes capIn{ from{ opacity:0; transform:translate(-50%,8px); } to{ opacity:1; transform:translate(-50%,0); } }
 
 /* ---- per-compound personalities (applied to .compound) ---- */
-/* water — plops down then wobbles */
+/* water, plops down then wobbles */
 .p-water{ animation:p-plop 1.1s var(--ease-bounce) .5s both; }
 @keyframes p-plop{ 0%{ transform:translateY(-30px); } 55%{ transform:translateY(10px) scaleY(.86) scaleX(1.12); }
   72%{ transform:translateY(0) scaleY(1.08) scaleX(.94); } 100%{ transform:translateY(0); } }
-/* salt — snaps crisp then glints */
+/* salt, snaps crisp then glints */
 .p-salt{ animation:p-snap .5s var(--ease-bounce) .5s both; }
 @keyframes p-snap{ 0%{ transform:scale(.6) rotate(-12deg); } 60%{ transform:scale(1.12) rotate(4deg); } 100%{ transform:scale(1) rotate(0); } }
-/* co2 / o2 — rise gently */
+/* co2 / o2, rise gently */
 .p-rise{ animation:p-rise 2.6s ease-in-out .5s infinite alternate; }
 @keyframes p-rise{ from{ transform:translateY(4px); } to{ transform:translateY(-12px); } }
-/* hcl — fume jitter */
+/* hcl, fume jitter */
 .p-fume{ animation:p-fume 1.6s ease-in-out .5s infinite; }
 @keyframes p-fume{ 0%,100%{ transform:translate(0,0) rotate(0); } 25%{ transform:translate(1px,-3px) rotate(.6deg); } 50%{ transform:translate(-1px,-1px) rotate(-.6deg); } 75%{ transform:translate(1px,-4px) rotate(.4deg); } }
-/* ammonia / methane — wobble */
+/* ammonia / methane, wobble */
 .p-wobble{ animation:p-wobble 2.2s ease-in-out .5s infinite; }
 @keyframes p-wobble{ 0%,100%{ transform:rotate(-3deg); } 50%{ transform:rotate(3deg); } }
-/* mgo — handled by flash overlay; sits still bright */
+/* mgo, handled by flash overlay; sits still bright */
 .p-flash{ animation:p-pulseBright 1.8s ease-in-out .9s infinite alternate; }
 @keyframes p-pulseBright{ from{ filter:brightness(1); } to{ filter:brightness(1.25); } }
-/* rust — creep + tiny crumble shake */
+/* rust, creep + tiny crumble shake */
 .p-creep{ animation:p-crumble 3s ease-in-out .8s infinite; }
 @keyframes p-crumble{ 0%,100%{ transform:translateY(0) rotate(0); } 70%{ transform:translateY(0) rotate(0); } 85%{ transform:translateY(1px) rotate(.8deg); } 92%{ transform:translateY(0) rotate(-.6deg); } }
-/* diamond — squeeze then twinkle scale */
+/* diamond, squeeze then twinkle scale */
 .p-diamond{ animation:p-squeeze .8s var(--ease-bounce) .5s both; }
 @keyframes p-squeeze{ 0%{ transform:scaleX(1.3) scaleY(.7); } 45%{ transform:scaleX(.8) scaleY(1.18); } 70%{ transform:scale(1.06); } 100%{ transform:scale(1); } }
-/* so2 — puff */
+/* so2, puff */
 .p-puff{ animation:p-puff .9s var(--ease-bounce) .5s both; }
 @keyframes p-puff{ 0%{ transform:scale(.5); } 55%{ transform:scale(1.16); } 100%{ transform:scale(1); } }
-/* h2 — shoot up */
+/* h2, shoot up */
 .p-shoot{ animation:p-shoot 1.1s var(--ease-bounce) .5s both; }
 @keyframes p-shoot{ 0%{ transform:translateY(26px); } 55%{ transform:translateY(-14px) scaleY(1.1); } 100%{ transform:translateY(0); } }
-/* no2 — slow ugly drift */
+/* no2, slow ugly drift */
 .p-drift{ animation:p-uglydrift 4s ease-in-out .6s infinite alternate; }
 @keyframes p-uglydrift{ from{ transform:translate(-4px,2px) rotate(-1deg); } to{ transform:translate(5px,-4px) rotate(1.5deg); } }
 
@@ -398,7 +398,7 @@ footer a{ color:var(--ink); }
     </div>
   </div>
 
-  <p class="tray-label">your elements — drag one out, or tap to pick</p>
+  <p class="tray-label">your elements, drag one out, or tap to pick</p>
   <div class="tray" id="tray" role="list" aria-label="Element tray"></div>
 
   <div class="log-head">
@@ -421,15 +421,15 @@ footer a{ color:var(--ink); }
 
 <script>
 /* =========================================================================
-   DATA — curated, not simulated.
+   DATA, curated, not simulated.
    ========================================================================= */
 const ELEMENTS = [
   { sym:"H",  name:"Hydrogen",  type:"reactive", color:"var(--c-h)",  size:.72, fact:"The lightest element and the most common stuff in the universe.", form:"H" },
-  { sym:"O",  name:"Oxygen",    type:"reactive", color:"var(--c-o)",  size:1,   fact:"Eager to bond — it's why iron rusts and fires burn.", form:"O" },
+  { sym:"O",  name:"Oxygen",    type:"reactive", color:"var(--c-o)",  size:1,   fact:"Eager to bond. It's why iron rusts and fires burn.", form:"O" },
   { sym:"C",  name:"Carbon",    type:"reactive", color:"var(--c-c)",  size:.96, fact:"The backbone of every living thing you've ever met.", form:"C", dark:true },
-  { sym:"N",  name:"Nitrogen",  type:"reactive", color:"var(--c-n)",  size:.94, fact:"Calm and unreactive — it makes up most of the air you breathe.", form:"N" },
+  { sym:"N",  name:"Nitrogen",  type:"reactive", color:"var(--c-n)",  size:.94, fact:"Calm and unreactive. It makes up most of the air you breathe.", form:"N" },
   { sym:"Na", name:"Sodium",    type:"reactive", color:"var(--c-na)", size:.92, fact:"So jittery it bursts into flame the moment it touches water.", form:"Na" },
-  { sym:"Cl", name:"Chlorine",  type:"reactive", color:"var(--c-cl)", size:.96, fact:"A green, choking gas on its own — genuinely poisonous.", form:"Cl" },
+  { sym:"Cl", name:"Chlorine",  type:"reactive", color:"var(--c-cl)", size:.96, fact:"A green, choking gas on its own; genuinely poisonous.", form:"Cl" },
   { sym:"Mg", name:"Magnesium", type:"reactive", color:"var(--c-mg)", size:.98, fact:"Burns with a blinding white light that's hard to put out.", form:"Mg" },
   { sym:"Fe", name:"Iron",      type:"reactive", color:"var(--c-fe)", size:1.02,fact:"Heavy, metallic, and the core of our whole planet.", form:"Fe" },
   { sym:"S",  name:"Sulfur",    type:"reactive", color:"var(--c-s)",  size:.94, fact:"Bright yellow and famous for its rotten-egg smell.", form:"S" },
@@ -622,7 +622,7 @@ function zonePos(x,y){
 function defaultPos(i){ return i===0 ? {fx:.37, fy:.5} : {fx:.63, fy:.5}; }
 
 /* tap on a tile: select it (and place if zone is the obvious next move) */
-/* A tap on a tile places it straight into the zone — tap two and they combine.
+/* A tap on a tile places it straight into the zone, tap two and they combine.
    This matches the natural instinct on phones better than tap-select-then-tap-zone,
    and we still flash the fun-fact card so the fact stays reachable by tap. */
 function handleTap(sym, tile, e){
@@ -849,7 +849,7 @@ function nobleGag(sym){
     const str = document.createElement("div"); str.className="balloon-string"; blob.appendChild(str);
     blob.classList.add("gag-float");
     other?.querySelector(".blob")?.classList.add("wiggle");
-    toast("Helium floats off — it won't bond with anything.");
+    toast("Helium floats off. It won't bond with anything.");
   } else {
     const blob = target.querySelector(".blob");
     blob.classList.add("gag-shrug");
@@ -944,7 +944,7 @@ function celebrate(key){
   const n = state.found.size;
   if(n>=4 && n<13 && !state.found.has("Mg+O") && !nudged){
     nudged = true;
-    setTimeout(()=>toast("Psst — most people miss the magnesium one.", 3000), 1400);
+    setTimeout(()=>toast("Psst, most people miss the magnesium one.", 3000), 1400);
   }
 }
 let nudged = false;
