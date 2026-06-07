@@ -499,7 +499,11 @@ const state = {
   resolved: false,   // a result is showing
   busy: false,       // mid-animation, ignore input
   found: new Set(),  // discovered reaction keys
+  timers: [],        // pending reaction timeouts, cancelled on clear
 };
+// schedule a reaction-step timeout that clearZone() can cancel, so clearing
+// the zone mid-animation can't have a stale reveal pop back in afterwards
+function later(fn, ms){ const id = setTimeout(fn, ms); state.timers.push(id); return id; }
 const LS_KEY = "tinyreactions.found.v1";
 try{ const saved = JSON.parse(localStorage.getItem(LS_KEY)||"[]");
      saved.forEach(k=>{ if(REACTIONS[k]) state.found.add(k); }); }catch(e){}
@@ -662,7 +666,7 @@ function placeElement(sym, pos){
     zoneHint.style.opacity = 0;
   } else if(state.zone.length===2){
     state.busy = true;
-    setTimeout(resolve, 480);
+    later(resolve, 480);
   }
 }
 
@@ -681,7 +685,7 @@ function renderSlot(item, i){
   blob.classList.add("dropin");
   zone.appendChild(slot);
   // first element drops in, THEN starts breathing while it waits for a partner
-  if(i===0) setTimeout(()=>{ if(state.zone.length===1 && !state.busy) blob.classList.add("pulse"); }, 470);
+  if(i===0) later(()=>{ if(state.zone.length===1 && !state.busy) blob.classList.add("pulse"); }, 470);
 }
 
 function resolve(){
@@ -717,9 +721,9 @@ function validCombine(key, r){
     slot.style.transform = `translate(-50%,-50%) scale(${(el.size||1)*0.82})`;
   });
 
-  setTimeout(()=>spawnBurst(mid), 380);
+  later(()=>spawnBurst(mid), 380);
 
-  setTimeout(()=>{
+  later(()=>{
     [...zone.querySelectorAll(".slot")].forEach(n=>n.remove());
     revealCompound(key, r, mid);
     const isNew = !state.found.has(key);
@@ -831,7 +835,7 @@ function applyEffect(anim, comp){
 function invalid(){
   zone.querySelectorAll(".slot .blob").forEach(b=>{ b.classList.remove("pulse"); b.classList.add("wiggle"); });
   toast("These two don't react. Try another pair.");
-  setTimeout(()=>{ clearZone(); }, 950);
+  later(()=>{ clearZone(); }, 950);
 }
 
 function nobleGag(sym){
@@ -858,13 +862,14 @@ function nobleGag(sym){
     other?.querySelector(".blob")?.classList.add("wiggle");
     toast("Gold just shrugs. It refuses to react.");
   }
-  setTimeout(()=>{ clearZone(); }, 1700);
+  later(()=>{ clearZone(); }, 1700);
 }
 
 /* =========================================================================
    CLEAR / RESET
    ========================================================================= */
 function clearZone(){
+  state.timers.forEach(clearTimeout); state.timers = [];   // kill any pending reaction step
   state.zone = []; state.resolved=false; state.busy=false;
   clearSelection();
   [...zone.querySelectorAll(".slot,.compound,.burst,.haze,.particle,.glint")].forEach(n=>n.remove());
@@ -906,7 +911,7 @@ function replay(key){
   clearZone();
   zone.classList.add("busy","armed"); state.busy=true;
   spawnBurst({fx:.5,fy:.5});
-  setTimeout(()=>{
+  later(()=>{
     revealCompound(key, REACTIONS[key], {fx:.5,fy:.5});
     state.busy=false; state.resolved=true;
   }, 200);
